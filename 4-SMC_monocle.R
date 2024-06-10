@@ -1,4 +1,68 @@
 library(Seurat)
+setwd("~/20240103_Atherosis/result/Fig_SMC/subset_seurat")
+seurat.obj <- readRDS("~/20240103_Atherosis/result/1-dealdata/seurat_integration_anno.rds")
+sub.seurat.obj <- subset(
+  seurat.obj,
+  idents = "SMC"
+)
+saveRDS(sub.seurat.obj, file = "SMC亚群.rds")
+DefaultAssay(sub.seurat.obj) <- "RNA"
+sub.seurat.obj <- FindVariableFeatures(sub.seurat.obj,
+                                       selection.method = "vst",
+                                       nfeatures = 2000)
+all.genes <- rownames(sub.seurat.obj)
+sub.seurat.obj <- ScaleData(sub.seurat.obj, features = all.genes)
+sub.seurat.obj <- RunPCA(sub.seurat.obj,
+                         features = VariableFeatures(sub.seurat.obj))
+ElbowPlot(sub.seurat.obj, ndims = 50)
+ndims <- 15
+sub.seurat.obj <- FindNeighbors(sub.seurat.obj, dims = 1:ndims)
+sub.seurat.obj <- FindClusters(sub.seurat.obj, resolution = 0.3)
+sub.seurat.obj <- RunUMAP(sub.seurat.obj, dims = 1:ndims)
+sub.seurat.obj <- RunTSNE(sub.seurat.obj, dims = 1:ndims)
+DimPlot(sub.seurat.obj, reduction = "umap")
+DefaultAssay(sub.seurat.obj) <- "RNA"
+FeaturePlot(sub.seurat.obj,
+            features = c(
+              "ACTA2", "PHACTR1", "PDGFR",  
+              "TNFRSF11B",
+              "SOX9",
+              "C3",
+              "CD68", "LGALS3"
+            ))
+ggsave("marker.pdf",height = 10,width = 10)
+
+markers <- FindAllMarkers(
+  sub.seurat.obj,
+  only.pos = TRUE,
+  min.pct = 0.25,
+  logfc.threshold = 0.25
+)
+top.markers <- markers %>%
+  group_by(cluster) %>%
+  slice_max(n = 20, order_by = avg_log2FC)
+write.table(top.markers[top.markers$cluster=="0",]$gene,
+            quote = F, row.names = F)
+
+DotPlot(sub.seurat.obj, features = unique(top.markers$gene),
+        col.min = 0) +
+  theme(axis.text.x = element_text(size = 12,angle = 45,hjust = 1) )
+ggsave("dotplot.pdf",height = 5,
+       width = 10) 
+new.cluster.ids <- c(
+  "SMC1", 
+  "SMC2"
+)
+names(new.cluster.ids) <- levels(sub.seurat.obj)
+sub.seurat.obj <- RenameIdents(sub.seurat.obj, new.cluster.ids)
+sub.seurat.obj$sub_cell_type <- Idents(sub.seurat.obj)
+
+DimPlot(sub.seurat.obj, reduction = "umap", label = T) + NoLegend()
+head(sub.seurat.obj)
+saveRDS(sub.seurat.obj, 
+        file = "SMC_anno.rds")
+
+library(Seurat)
 library(tidyverse)
 # umap----
 setwd("~/20240103_Atherosis/result/Fig_SMC/subset_seurat")
