@@ -41,14 +41,6 @@ ggsave(
   width = 6
 )
 
-DimPlot(seurat_obj,split.by = "donor",reduction = "tsne",ncol = 4,
-        cols = c("#B07AA1","#F89C74","#66C5CC","#75ACC3","#FE88B1","#80BA5A","#F6CF71","#EDC948","#B84D64",
-                 "#008695","#59A14F","#FF9DA7","#F28E2B","#DCB0F2","#EE7072","#E73F74","#f69896","#9B8E8C",
-                 "#E68310","#E15759"),
-        raster = F
-)
-ggsave("donortsne2.pdf",height = 5,width = 12)
-
 # 基因表达量--------
 library(Seurat)
 library(tidyverse)
@@ -57,9 +49,9 @@ path <-"~/20240103_Atherosis/v2/result/1-dealdata/seurat_integration_anno2.rds"
 seurat_obj <- readRDS(path)
 table(seurat_obj$cell_type)
 seurat_obj <- subset(seurat_obj,idents = c("Fibroblast 1","Endothelial","Macrophage","Fibromyocyte",
-                                            "T cell","Smooth muscle cell","Pericyte 1","Pericyte 2","B cell",
-                                            "Plasma cell 1","Fibroblast 2","Neuron","Plasma cell 2","NK cell",
-                                            "Mast cell"))
+                                           "T cell","Smooth muscle cell","Pericyte 1","Pericyte 2","B cell",
+                                           "Plasma cell 1","Fibroblast 2","Neuron","Plasma cell 2","NK cell",
+                                           "Mast cell"))
 seurat_obj
 saveRDS(seurat_obj,"~/20240103_Atherosis/v2/result/1-dealdata/seurat_integration_anno2sub.rds")
 
@@ -349,72 +341,3 @@ p4 <- DotPlot(seurat, features = features,
 pdf(file = "p4.pdf",width =10,height = 5)
 print(p4)
 dev.off()
-
-# 比例----
-seurat.obj <-
-  readRDS("~/20240103_Atherosis/v2/result/1-dealdata/seurat_integration_anno2sub.rds")
-DefaultAssay(seurat.obj) <- "RNA"
-seurat.obj <- NormalizeData(seurat.obj)
-features <- c("FTO","METTL3","METTL14","RBM15","RBM15B", "WTAP","CBLL1","ZC3H13","ALKBH5",
-              "YTHDC1","YTHDC2","YTHDF1","YTHDF2","YTHDF3","IGF2BP1", "IGF2BP2","IGF2BP3",
-              "HNRNPA2B1","HNRNPC", "FMR1","LRPPRC","ELAVL1","VIRMA")
-features[!(features %in% colnames(seurat.obj@assays$RNA@data))]
-prop <- data.frame()
-for (feature in features) {
-  if (feature %in% rownames(seurat.obj@assays$RNA@data)) {
-    pn <-
-      as.data.frame(t(ifelse(
-        as.matrix(seurat.obj[feature, ]@assays$RNA@data) > 0,
-        "postive",
-        "negative"
-      )))
-    seurat.obj <-
-      AddMetaData(seurat.obj,
-                  metadata = pn,
-                  col.name = paste0("pn_", feature))
-    df <-
-      as.data.frame(prop.table(
-        table(seurat.obj$cell_type,
-              seurat.obj@meta.data[, paste0("pn_", feature)]),
-        margin = 1
-      ))
-    df$feature <- feature
-    prop <- rbind(prop, df)
-  }
-}
-head(prop)
-colnames(prop) <- c("cell_type", "group", "freq", "feature")
-library(showtext)
-pdf("percent.pdf",height = 3.5,width = 7)
-p1 <-
-  ggplot(prop[prop$group == "postive", ],
-         aes(x = freq * 100, y = feature, fill = cell_type)
-  ) +
-  geom_bar(stat = "identity",color = "black",linewidth =0.1) +
-  facet_grid(. ~ cell_type) +
-  theme_bw() +
-  theme(
-    axis.text.y = element_text(
-      face = "italic",
-      colour = "black",
-      size = 3,
-    ),
-    axis.title.y = element_blank(),
-    axis.text.x = element_text(
-      colour = "black",
-      size = 3,
-      # family = "Arial"
-    ),
-    strip.background = element_blank(),
-    strip.text = element_text(size = 5, ),
-    axis.title.x = element_text(size = 5, ),
-    panel.grid = element_blank()
-  ) +
-  labs(x = "Cell proportion (%)") +
-  guides(fill = "none") +
-  scale_fill_manual(values = rep(c("#C7E9C0","#A1D99B","#00CC33","#74C476","#41AB5D","#238B45","#33CC33","#66CC00","#33CC00","#66CC66","#66CC99","#339966","#339900","#669900","#009966","#339933","#339900"),2))
-print(p1)
-dev.off()
-
-
-
