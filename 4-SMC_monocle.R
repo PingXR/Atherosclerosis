@@ -1,5 +1,7 @@
+# recluster----
 library(Seurat)
 setwd("~/20240103_Atherosis/result/Fig_SMC/subset_seurat")
+
 seurat.obj <- readRDS("~/20240103_Atherosis/result/1-dealdata/seurat_integration_anno.rds")
 sub.seurat.obj <- subset(
   seurat.obj,
@@ -31,7 +33,6 @@ FeaturePlot(sub.seurat.obj,
               "CD68", "LGALS3"
             ))
 ggsave("marker.pdf",height = 10,width = 10)
-
 markers <- FindAllMarkers(
   sub.seurat.obj,
   only.pos = TRUE,
@@ -62,9 +63,9 @@ head(sub.seurat.obj)
 saveRDS(sub.seurat.obj, 
         file = "SMC_anno.rds")
 
+# tsne----
 library(Seurat)
 library(tidyverse)
-# umap----
 setwd("~/20240103_Atherosis/result/Fig_SMC/subset_seurat")
 path <-
   "SMC_anno.rds"
@@ -115,36 +116,12 @@ ggsave(
   height =4,
   width = 5
 )
-# 映射----
+
+# monocle2----
 library(monocle)
 library(Seurat)
-library(ggplot2)
-pbmc <- readRDS("~/20240103_Atherosis/result/Fig_SMC/subset_seurat/SMC_anno.rds")
-head(pbmc@reductions$umap@cell.embeddings)
-HSMM <- readRDS("~/20240103_Atherosis/result/Fig_SMC/Supply/SMC_cds.rds")
-head(HSMM@phenoData@data)
-pbmc@meta.data$Pseudotime <- HSMM@phenoData@data$Pseudotime 
-head(pbmc@meta.data)
-p3 <- plot_cell_trajectory(HSMM, color_by = "Pseudotime")+
-  scale_color_gradientn(values = seq(0,1,0.2),
-                        colours = c('blue','cyan','green','yellow','orange','red'))
-p3
-mydata<- FetchData(pbmc,vars = c("tSNE_1","tSNE_2","Pseudotime"))
-p <- ggplot(mydata,aes(x = tSNE_1,y =tSNE_2,colour = Pseudotime))+
-  geom_point_rast(size = 1)+
-  scale_color_gradientn(values = seq(0,1,0.2),
-                        colours = c('#324cd9',"#25cb78",'yellow','orange','red'))
-p4 <- p + theme_bw() + theme(panel.border = element_blank(), 
-                             panel.grid.major = element_blank(),
-                             panel.grid.minor = element_blank(), 
-                             axis.line = element_line(colour = "black"))
-p4
-outdir <- "~/20240103_Atherosis/result/Fig_SMC/Supply/映射tsne.pdf"
-ggsave(filename = paste0(outdir,"umap_pesudotime2.pdf"),
-       plot = p4,
-       height = 4,
-       width = 5)
-# monocle2----
+library(dplyr) 
+library(ggsci)
 setwd("~/20240103_Atherosis/result/Fig_SMC/Supply")
 seurat.obj <-
   readRDS("~/20240103_Atherosis/result/Fig_SMC/subset_seurat/SMC_anno.rds")
@@ -216,26 +193,65 @@ p4 <- plot_cell_trajectory(cds,
   scale_color_npg()
 p <- p1+p2+p3+p4
 ggsave("1.pdf",p,height = 8,width = 8)
-# 打分----
-PsPseudoGenes <- read_csv("~/20240103_Atherosis/v2/code/Fig_SMC/5-supply/10-PSintersectPseudoGenes/PsPseudoGenes.csv")
-PsPseudoGenes <- PsPseudoGenes$x
-seurat_obj <-
-  AddModuleScore(seurat_obj, features = list(PsPseudoGenes), name = "PsPseudoGenes")
-p <- VlnPlot(
-  seurat_obj,
-  features = "PsPseudoGenes1",
-  group.by = "sub_cell_type",
-  pt.size = 0,
-  sort = T
-) +
-  NoLegend() +
-  labs(title = "Genes Score") +
-  stat_compare_means()+
-  theme(aspect.ratio = 0.3,
-        axis.title.x = element_blank()) +
-  scale_fill_manual(values = rep(c("#7FC97F","#BEAED4","#E64B35FF","#FDC086", "#FFFF99", "#386CB0",
-                                   "#F0027F", "#BF5B17","#4dBBD5FF","#3C5488FF","#F39B7FFF","#91D1C2FF"),2))
-ggsave("PS.pdf",p,height = 5,width = 3)
+
+Time_genes <-top_n(deg, n = 1000, desc(p_val_adj)) %>% pull(gene) %>% as.character() 
+Time_genes <- unique(Time_genes)
+p <- plot_pseudotime_heatmap(
+  cds[Time_genes,],
+  num_clusters = 2,
+  show_rownames = T,
+  return_heatmap = T,
+  hmcols =colorRampPalette(rev(brewer.pal(9, "PRGn")))(100)
+)
+ggsave("heatmap3.pdf",p,height = 5,width = 5)
+clusters <- cutree(p$tree_row, k = 2) 
+table(clusters)
+genes <- names(clusters[clusters == 1])
+write.table(genes,
+            quote = F,
+            row.names = F,
+            col.names = F,
+            file = "./gene/SMC_genes-1.txt")
+
+# mapping umap----
+library(monocle)
+library(Seurat)
+library(ggplot2)
+pbmc <- readRDS("~/20240103_Atherosis/result/Fig_SMC/subset_seurat/SMC_anno.rds")
+head(pbmc@reductions$umap@cell.embeddings)
+HSMM <- readRDS("~/20240103_Atherosis/result/Fig_SMC/Supply/SMC_cds.rds")
+head(HSMM@phenoData@data)
+pbmc@meta.data$Pseudotime <- HSMM@phenoData@data$Pseudotime 
+head(pbmc@meta.data)
+p3 <- plot_cell_trajectory(HSMM, color_by = "Pseudotime")+
+  scale_color_gradientn(values = seq(0,1,0.2),
+                        colours = c('blue','cyan','green','yellow','orange','red'))
+p3
+mydata<- FetchData(pbmc,vars = c("tSNE_1","tSNE_2","Pseudotime"))
+p <- ggplot(mydata,aes(x = tSNE_1,y =tSNE_2,colour = Pseudotime))+
+  geom_point_rast(size = 1)+
+  scale_color_gradientn(values = seq(0,1,0.2),
+                        colours = c('#324cd9',"#25cb78",'yellow','orange','red'))
+p4 <- p + theme_bw() + theme(panel.border = element_blank(), 
+                             panel.grid.major = element_blank(),
+                             panel.grid.minor = element_blank(), 
+                             axis.line = element_line(colour = "black"))
+p4
+outdir <- "~/20240103_Atherosis/result/Fig_SMC/Supply/映射tsne.pdf"
+ggsave(filename = paste0(outdir,"umap_pesudotime2.pdf"),
+       plot = p4,
+       height = 4,
+       width = 5)
+
+# vlnplot----
+library(msigdbr)
+library(Seurat)
+library(clusterProfiler)
+library(ggplot2)
+library(ggpubr)
+setwd("~/20240103_Atherosis/v2/result/Fig_SMC/5-supply/12-score")
+
+seurat_obj <- readRDS('~/20240103_Atherosis/result/Fig_SMC/subset_seurat/SMC_anno.rds')
 C5_gene_sets <- msigdbr::msigdbr(species = "human",
                                  category = "C5") %>%
   dplyr::select(gs_name, gene_symbol)
@@ -277,7 +293,16 @@ p <- VlnPlot(
   scale_fill_manual(values = rep(c("#7FC97F","#BEAED4","#E64B35FF","#FDC086", "#FFFF99", "#386CB0",
                                    "#F0027F", "#BF5B17","#4dBBD5FF","#3C5488FF","#F39B7FFF","#91D1C2FF"),2))
 ggsave("WTAP2.pdf",p,height = 5,width = 3)
-# 热图------
+
+# heatmap ------
+library(ClusterGVis)
+library(RColorBrewer)
+library(viridis)
+library(monocle) 
+library(Seurat) 
+library(dplyr) 
+setwd("~/20240103_Atherosis/v2/result/Fig_SMC/5-supply/2-beautymonocle")
+
 cds <- readRDS("~/20240103_Atherosis/result/Fig_SMC/Supply/SMC_cds.rds")
 deg <- read_delim("~/20240103_Atherosis/result/Fig_SMC/Supply/SMC_monocle_deg.txt")
 Time_genes <-top_n(deg, n = 1000, desc(p_val_adj)) %>% pull(gene) %>% as.character() #原来是ordergene，比较少，可以换成deg比较多
@@ -300,17 +325,22 @@ selected_gene_sets <- C5_gene_sets %>%
 ATPgenes <- unique(selected_gene_sets$gene_symbol)
 C1gene <- read.table("~/20240103_Atherosis/result/Fig_SMC/Supply/gene/SMC_genes-1.txt")
 ATPgenes <- intersect(ATPgenes,C1gene$V1)
-marker <- c("ACTA2","MYH10","KLF4","KLF2") 
+marker <- c("ACTA2","MYH10","KLF4","KLF2") #"MYH11" ,"MYL9" ,"TAGLN"
 genes <- c(PsPseudoGenes,m6Afeatures,ATPgenes,marker)
 genes
 pdf("1genes.pdf",height = 8,width = 7)
 p <- plot_pseudotime_heatmap2(cds[genes,],
                               num_clusters = 2,
+                              # cores = 1,
                               show_rownames = T,
                               return_heatmap = T,
+                              # hmcols =colorRampPalette(rev(brewer.pal(9, "PRGn")))(100))
                               hmcols = colorRampPalette(c("#096ab3", "white", "#e2450c"))(100))
 print(p)
 dev.off()
+
+gene <- c("ACTA2","MYH10","KLF4","KLF2","WTAP","FOS","JUN","JUNB","MYC",
+          "KLF10","ATP5PF","COX5A","ATP5F1A","PGK1","PDGFA","CD46","NOTCH2","NOTCH3")# 挑一些基因展示
 pdf(file = "4one-branch.pdf",height = 6,width = 7)
 p3 <- visCluster(object = df,plot.type = "both",markGenes = gene,
                  pseudotime_col = c("#096ab3", "#e2450c"),
@@ -318,178 +348,13 @@ p3 <- visCluster(object = df,plot.type = "both",markGenes = gene,
                                     col_color = colorRampPalette(brewer.pal(9,"PRGn"))(100)))
 print(p3)
 dev.off()
-# 通路打分----
-seurat_obj <-
-  readRDS("~/20240103_Atherosis/result/Fig_SMC/subset_seurat/SMC_anno.rds")
-C5_gene_sets <- msigdbr::msigdbr(species = "human",
-                                 category = "C5") %>%
-  dplyr::select(gs_name, gene_symbol)
-a <- as.data.frame(unique(C5_gene_sets$gs_name))
-selected_gene_sets <- C5_gene_sets %>%
-  filter(gs_name %in% c(
-    "GOBP_POSITIVE_REGULATION_OF_SMOOTH_MUSCLE_CELL_MIGRATION",
-    "GOBP_POSITIVE_REGULATION_OF_SMOOTH_MUSCLE_CELL_PROLIFERATION",
-    "GOBP_POSITIVE_REGULATION_OF_VASCULAR_ASSOCIATED_SMOOTH_MUSCLE_CELL_MIGRATION",
-    "GOBP_POSITIVE_REGULATION_OF_VASCULAR_ASSOCIATED_SMOOTH_MUSCLE_CELL_PROLIFERATION",
-    "GOBP_SMOOTH_MUSCLE_CELL_MIGRATION",
-    "GOBP_SMOOTH_MUSCLE_CELL_PROLIFERATION",
-    "GOBP_SMOOTH_MUSCLE_CELL_MATRIX_ADHESION",
-    "GOBP_REGULATION_OF_SMOOTH_MUSCLE_CELL_CHEMOTAXIS",
-    "GOBP_CELL_MATRIX_ADHESION",
-    "GOBP_PHENOTYPIC_SWITCHING",
-    "GOBP_ATP_METABOLIC_PROCESS",
-    "GOBP_OXIDATIVE_PHOSPHORYLATION",
-    "GOBP_AEROBIC_RESPIRATION",
-    "GOBP_RESPIRATORY_ELECTRON_TRANSPORT_CHAIN",
-    "GOBP_CELLULAR_RESPIRATION",
-    "GOBP_POSITIVE_REGULATION_OF_GLYCOLYTIC_PROCESS",
-    "GOBP_NUCLEOSIDE_TRIPHOSPHATE_METABOLIC_PROCESS"
-  ))
-selected_gene_sets
-cells_rankings <- AUCell_buildRankings(as.matrix(seurat_obj@assays$RNA@data))
-cells_rankings
-geneSets<-lapply(unique(selected_gene_sets$gs_name),
-                 function(x){selected_gene_sets$gene_symbol[selected_gene_sets$gs_name==x]})
-View(geneSets)
-names(geneSets) <- unique(selected_gene_sets$gs_name)
-saveRDS(geneSets,"geneSets.rds")
-cells_AUC <- AUCell_calcAUC(geneSets, cells_rankings, aucMaxRank=nrow(cells_rankings)*0.05)
-cells_AUC
-saveRDS(cells_AUC,"auc.rds")
-aucs <- getAUC(cells_AUC)
-saveRDS(aucs,"aucs.RDS")
-aucs <- t(aucs)
-aucs <- as.data.frame(aucs)
-cds <- readRDS("~/20240103_Atherosis/result/Fig_SMC/Supply/SMC_cds.rds")
-cdsdata <- pData(cds)
-b <- cbind(cdsdata,aucs)
-pData(cds) <- b
-name <- colnames(aucs)
-for(i in name){
-  p <- plot_cell_trajectory(cds,
-                            color_by = i,
-                            size = 1,
-                            show_backbone = TRUE) + 
-    scale_color_gradientn(colours = c("#2c0ab9", "#dd332f","#f8b072","#eef314"))
-  ggsave(paste0(i,".pdf"),p,height = 6,width =6)
-}
-# 相关性-----
-adata <- read_csv("/home/pingxr/Atherosis_0723/20230204_Atherosis/result/SMC/SMC/k_20/correlation/gene.cor.csv")
-filtered_adata <- adata %>%
-  filter(p_value <= 0.05)
-p <- filtered_adata %>%
-  filter(feature_x %in% selected_genes,
-         feature_y %in% selected_features) %>%
-  mutate(
-    feature_x = fct_relevel(feature_x, selected_genes),
-    feature_y = fct_relevel(feature_y, selected_features)
-  ) %>%
-  catdotplot(
-    x = feature_x,
-    y = feature_y,
-    size = -log10(p_value),
-    color = estimate,
-    title = selected_cell_type
-  ) +
-  coord_fixed() +
-  scale_color_gradient2(
-    low = "#2009af", mid = "white", high = "#af2934")+
-  theme(
-    panel.grid = element_line(size = 0.2, color = "lightgrey"),
-    axis.text = element_text(face = "italic")
-  )
-p
-ggsave(
-  file.path(outdir, "genes_cor1.pdf"),
-  plot = p,
-  height = 4,
-  width = 4,
-)
-selected_genes <- c("WTAP")
-adata <- read_csv("~/Atherosis_0723/20230204_Atherosis/result/SMC/SMC/k_20/correlation/GO:BP.cor.csv")
-filtered_adata <- adata %>%
-  filter(p_value <= 0.05)
-selected_features <- c(     
-  "GOBP_CELLULAR_RESPIRATION",
-  "GOBP_AEROBIC_RESPIRATION",
-  "GOBP_ATP_METABOLIC_PROCESS",
-  "GOBP_OXIDATIVE_PHOSPHORYLATION",
-  "GOBP_RIBONUCLEOSIDE_METABOLIC_PROCESS",
-  "GOBP_ATP_BIOSYNTHETIC_PROCESS",
-  "GOBP_PHENOTYPIC_SWITCHING"
-)
-p <- filtered_adata %>%
-  filter(feature_x %in% selected_genes,
-         feature_y %in% selected_features) %>%
-  dplyr:: mutate(
-    feature_x = fct_relevel(feature_x, selected_genes),
-    feature_y = fct_relevel(feature_y, selected_features)
-  ) %>%
-  catdotplot(
-    x = feature_x,
-    y = feature_y,
-    size = -log10(p_value),
-    color = estimate,
-    dot_scale = 7,
-    title = selected_cell_type
-  ) +
-  scale_color_gradient2(
-    low = "#2009af", mid = "white", high = "#af2934")+
-  coord_fixed() +
-  theme(
-    panel.grid = element_line(size = 0.2, color = "lightgrey"),
-    axis.text.x = element_text(face = "italic")
-  )
-p  
-ggsave(
-  file.path(outdir, "term_cor1.pdf"),
-  plot = p,
-  height = 4,
-  width = 4,
-)
-# 基因轨迹----
-PsPseudoGenes <- read_csv("~/20240103_Atherosis/v2/code/Fig_SMC/5-supply/10-PSintersectPseudoGenes/PsPseudoGenes.csv")
-PsPseudoGenes <- PsPseudoGenes$x
-C2gene <- read.table("~/20240103_Atherosis/result/Fig_SMC/Supply/gene/SMC_genes-2.txt")
-PsPseudoGenes <- intersect(C2gene$V1,PsPseudoGenes)
-m6Afeatures = c("FTO","METTL3","METTL14","RBM15","RBM15B", "WTAP","CBLL1","ZC3H13","ALKBH5",
-                "YTHDC1","YTHDC2","YTHDF1","YTHDF2","YTHDF3","IGF2BP1", "IGF2BP2","IGF2BP3",
-                "HNRNPA2B1","HNRNPC", "FMR1","LRPPRC","ELAVL1","VIRMA")
-C5_gene_sets <- msigdbr::msigdbr(species = "human", category = "C5") %>% dplyr::select(gs_name, gene_symbol)
-a <- as.data.frame(unique(C5_gene_sets$gs_name))
-selected_gene_sets <- C5_gene_sets %>%
-  filter(gs_name %in% c( "GOBP_ATP_METABOLIC_PROCESS"  )) 
-ATPgenes <- unique(selected_gene_sets$gene_symbol)
-C1gene <- read.table("~/20240103_Atherosis/result/Fig_SMC/Supply/gene/SMC_genes-1.txt")
-ATPgenes <- intersect(ATPgenes,C1gene$V1)
-marker <- c("ACTA2","MYH10","KLF4","KLF2") 
-genes <- c(PsPseudoGenes,m6Afeatures,ATPgenes,marker)
-genes
-C5_gene_sets <- msigdbr::msigdbr(species = "human", category = "C5") %>% dplyr::select(gs_name, gene_symbol)
-a <- as.data.frame(unique(C5_gene_sets$gs_name))
-selected_gene_sets <- C5_gene_sets %>%
-  filter(gs_name %in% c( "GOBP_PHENOTYPIC_SWITCHING"  )) 
-genes <- unique(selected_gene_sets$gene_symbol)
-deg <- read_delim("~/20240103_Atherosis/result/Fig_SMC/Supply/SMC_monocle_deg.txt")
-genes <- intersect(genes,deg$gene) # SOD2
-s.genes <- c("WTAP","ACTA2","MYH10","JUN","FOS","JUNB","KLF4","ATP5PF","ENO1",
-             "AGT","CCL2","KLF2","PPP1R15A","HIF1A","NDUFB2","PPP1CB","ATP5F1A",
-             "EGR1","TSPO","SDHC","NDUFS4")
-for(i in s.genes){
-  p <- plot_genes_in_pseudotime(cds[i,], 
-                                color_by = "sub_cell_type")+ 
-    scale_color_npg()
-  ggsave(paste0(i,".pdf"),p,height = 2,width = 4)
-}
 
-s.genes <- c("EGR1","JUN")
-for(i in s.genes){
-  p <- plot_genes_in_pseudotime(cds[i,], 
-                                color_by = "sub_cell_type")+ 
-    scale_color_npg()
-  ggsave(paste0(i,".pdf"),p,height = 2,width = 4)
-}
-# 功能富集----
+# go----
+setwd("~/20240103_Atherosis/result/Fig_SMC/Supply/go")
+library(clusterProfiler)
+library(org.Hs.eg.db) 
+library(dplyr)
+
 gene <- read.delim("~/20240103_Atherosis/result/Fig_SMC/Supply/gene/SMC_genes-2.txt", 
                    sep = ",", header = F)
 head(gene)
@@ -575,7 +440,232 @@ p <- ggplot(data = term1,
   scale_x_continuous(expand = c(0,0))
 ggsave("p3.pdf", plot = p,
        height = 3.5, width = 5)
-#基因打分 -----
+
+# pesudotime pathway----
+library(monocle) 
+library(Seurat) 
+library(dplyr) 
+library(ggsci)
+setwd("~/20240103_Atherosis/v2/result/Fig_SMC/5-supply/9-pseudotimepathway")
+outdir <- "~/20240103_Atherosis/v2/result/Fig_SMC/5-supply/9-pseudotimepathway"
+
+seurat_obj <-
+  readRDS("~/20240103_Atherosis/result/Fig_SMC/subset_seurat/SMC_anno.rds")
+C5_gene_sets <- msigdbr::msigdbr(species = "human",
+                                 category = "C5") %>%
+  dplyr::select(gs_name, gene_symbol)
+a <- as.data.frame(unique(C5_gene_sets$gs_name))
+selected_gene_sets <- C5_gene_sets %>%
+  filter(gs_name %in% c(
+    "GOBP_POSITIVE_REGULATION_OF_SMOOTH_MUSCLE_CELL_MIGRATION",
+    "GOBP_POSITIVE_REGULATION_OF_SMOOTH_MUSCLE_CELL_PROLIFERATION",
+    "GOBP_POSITIVE_REGULATION_OF_VASCULAR_ASSOCIATED_SMOOTH_MUSCLE_CELL_MIGRATION",
+    "GOBP_POSITIVE_REGULATION_OF_VASCULAR_ASSOCIATED_SMOOTH_MUSCLE_CELL_PROLIFERATION",
+    "GOBP_SMOOTH_MUSCLE_CELL_MIGRATION",
+    "GOBP_SMOOTH_MUSCLE_CELL_PROLIFERATION",
+    "GOBP_SMOOTH_MUSCLE_CELL_MATRIX_ADHESION",
+    "GOBP_REGULATION_OF_SMOOTH_MUSCLE_CELL_CHEMOTAXIS",
+    "GOBP_CELL_MATRIX_ADHESION",
+    "GOBP_PHENOTYPIC_SWITCHING",
+    "GOBP_ATP_METABOLIC_PROCESS",
+    "GOBP_OXIDATIVE_PHOSPHORYLATION",
+    "GOBP_AEROBIC_RESPIRATION",
+    "GOBP_RESPIRATORY_ELECTRON_TRANSPORT_CHAIN",
+    "GOBP_CELLULAR_RESPIRATION",
+    "GOBP_POSITIVE_REGULATION_OF_GLYCOLYTIC_PROCESS",
+    "GOBP_NUCLEOSIDE_TRIPHOSPHATE_METABOLIC_PROCESS"
+  ))
+selected_gene_sets
+cells_rankings <- AUCell_buildRankings(as.matrix(seurat_obj@assays$RNA@data))
+cells_rankings
+geneSets<-lapply(unique(selected_gene_sets$gs_name),
+                 function(x){selected_gene_sets$gene_symbol[selected_gene_sets$gs_name==x]})
+View(geneSets)
+names(geneSets) <- unique(selected_gene_sets$gs_name)
+saveRDS(geneSets,"geneSets.rds")
+cells_AUC <- AUCell_calcAUC(geneSets, cells_rankings, aucMaxRank=nrow(cells_rankings)*0.05)
+cells_AUC
+saveRDS(cells_AUC,"auc.rds")
+aucs <- getAUC(cells_AUC)
+saveRDS(aucs,"aucs.RDS")
+aucs <- t(aucs)
+aucs <- as.data.frame(aucs)
+cds <- readRDS("~/20240103_Atherosis/result/Fig_SMC/Supply/SMC_cds.rds")
+cdsdata <- pData(cds)
+b <- cbind(cdsdata,aucs)
+pData(cds) <- b
+name <- colnames(aucs)
+for(i in name){
+  p <- plot_cell_trajectory(cds,
+                            color_by = i,
+                            size = 1,
+                            show_backbone = TRUE) + 
+    scale_color_gradientn(colours = c("#2c0ab9", "#dd332f","#f8b072","#eef314"))
+  ggsave(paste0(i,".pdf"),p,height = 6,width =6)
+}
+
+
+# cor-----
+library(Seurat)
+library(tidyverse)
+source("/home/tutorial/20220802_scrna-m6A/code/computing/custom_function.R")
+source("/home/tutorial/20220802_scrna-m6A/code/visualization/custom_plot_function.R")
+library(magrittr)
+library(ggplot2)
+library(readr)
+library(dplyr)
+library(forcats)
+library(stringr)
+setwd("~/20240103_Atherosis/v2/result/Fig_SMC/5-supply/14-cor")
+outdir <- "~/20240103_Atherosis/v2/result/Fig_SMC/5-supply/14-cor/"
+dir.create(outdir, recursive = T)
+selected_features <- c("ACTA2","COX5A","MYH10","ATP5PF","ATP5F1A","PGK1",
+                       "KLF4","JUN","KLF2","MYC","KLF10","JUNB","FOS")
+selected_genes <- "WTAP"
+selected_cell_type <- "SMC"
+
+adata <- read_csv("/home/pingxr/Atherosis_0723/20230204_Atherosis/result/SMC/SMC/k_20/correlation/gene.cor.csv")
+filtered_adata <- adata %>%
+  filter(p_value <= 0.05)
+p <- filtered_adata %>%
+  filter(feature_x %in% selected_genes,
+         feature_y %in% selected_features) %>%
+  mutate(
+    feature_x = fct_relevel(feature_x, selected_genes),
+    feature_y = fct_relevel(feature_y, selected_features)
+  ) %>%
+  catdotplot(
+    x = feature_x,
+    y = feature_y,
+    size = -log10(p_value),
+    color = estimate,
+    title = selected_cell_type
+  ) +
+  coord_fixed() +
+  scale_color_gradient2(
+    low = "#2009af", mid = "white", high = "#af2934")+
+  theme(
+    panel.grid = element_line(size = 0.2, color = "lightgrey"),
+    axis.text = element_text(face = "italic")
+  )
+p
+ggsave(
+  file.path(outdir, "genes_cor1.pdf"),
+  plot = p,
+  height = 4,
+  width = 4,
+)
+
+selected_genes <- c("WTAP")
+adata <- read_csv("~/Atherosis_0723/20230204_Atherosis/result/SMC/SMC/k_20/correlation/GO:BP.cor.csv")
+filtered_adata <- adata %>%
+  filter(p_value <= 0.05)
+selected_features <- c(     
+  "GOBP_CELLULAR_RESPIRATION",
+  "GOBP_AEROBIC_RESPIRATION",
+  "GOBP_ATP_METABOLIC_PROCESS",
+  "GOBP_OXIDATIVE_PHOSPHORYLATION",
+  "GOBP_RIBONUCLEOSIDE_METABOLIC_PROCESS",
+  "GOBP_ATP_BIOSYNTHETIC_PROCESS",
+  "GOBP_PHENOTYPIC_SWITCHING"
+)
+p <- filtered_adata %>%
+  filter(feature_x %in% selected_genes,
+         feature_y %in% selected_features) %>%
+  dplyr:: mutate(
+    feature_x = fct_relevel(feature_x, selected_genes),
+    feature_y = fct_relevel(feature_y, selected_features)
+  ) %>%
+  catdotplot(
+    x = feature_x,
+    y = feature_y,
+    size = -log10(p_value),
+    color = estimate,
+    dot_scale = 7,
+    title = selected_cell_type
+  ) +
+  scale_color_gradient2(
+    low = "#2009af", mid = "white", high = "#af2934")+
+  coord_fixed() +
+  theme(
+    panel.grid = element_line(size = 0.2, color = "lightgrey"),
+    axis.text.x = element_text(face = "italic")
+  )
+p  
+ggsave(
+  file.path(outdir, "term_cor1.pdf"),
+  plot = p,
+  height = 4,
+  width = 4,
+)
+
+# pesudotime gene----
+library(ClusterGVis)
+library(RColorBrewer)
+library(viridis)
+library(monocle) 
+library(Seurat)
+library(dplyr) 
+library(ggsci)
+setwd("~/20240103_Atherosis/v2/result/Fig_SMC/5-supply/13-gene")
+
+cds <- readRDS("~/20240103_Atherosis/result/Fig_SMC/Supply/SMC_cds.rds")
+PsPseudoGenes <- read_csv("~/20240103_Atherosis/v2/code/Fig_SMC/5-supply/10-PSintersectPseudoGenes/PsPseudoGenes.csv")
+PsPseudoGenes <- PsPseudoGenes$x
+C2gene <- read.table("~/20240103_Atherosis/result/Fig_SMC/Supply/gene/SMC_genes-2.txt")
+PsPseudoGenes <- intersect(C2gene$V1,PsPseudoGenes)
+m6Afeatures = c("FTO","METTL3","METTL14","RBM15","RBM15B", "WTAP","CBLL1","ZC3H13","ALKBH5",
+                "YTHDC1","YTHDC2","YTHDF1","YTHDF2","YTHDF3","IGF2BP1", "IGF2BP2","IGF2BP3",
+                "HNRNPA2B1","HNRNPC", "FMR1","LRPPRC","ELAVL1","VIRMA")
+C5_gene_sets <- msigdbr::msigdbr(species = "human", category = "C5") %>% dplyr::select(gs_name, gene_symbol)
+a <- as.data.frame(unique(C5_gene_sets$gs_name))
+selected_gene_sets <- C5_gene_sets %>%
+  filter(gs_name %in% c( "GOBP_ATP_METABOLIC_PROCESS"  )) 
+ATPgenes <- unique(selected_gene_sets$gene_symbol)
+C1gene <- read.table("~/20240103_Atherosis/result/Fig_SMC/Supply/gene/SMC_genes-1.txt")
+ATPgenes <- intersect(ATPgenes,C1gene$V1)
+marker <- c("ACTA2","MYH10","KLF4","KLF2") 
+genes <- c(PsPseudoGenes,m6Afeatures,ATPgenes,marker)
+genes
+C5_gene_sets <- msigdbr::msigdbr(species = "human", category = "C5") %>% dplyr::select(gs_name, gene_symbol)
+a <- as.data.frame(unique(C5_gene_sets$gs_name))
+selected_gene_sets <- C5_gene_sets %>%
+  filter(gs_name %in% c( "GOBP_PHENOTYPIC_SWITCHING"  )) 
+genes <- unique(selected_gene_sets$gene_symbol)
+deg <- read_delim("~/20240103_Atherosis/result/Fig_SMC/Supply/SMC_monocle_deg.txt")
+genes <- intersect(genes,deg$gene) # SOD2
+s.genes <- c("WTAP","ACTA2","MYH10","JUN","FOS","JUNB","KLF4","ATP5PF","ENO1",
+             "AGT","CCL2","KLF2","PPP1R15A","HIF1A","NDUFB2","PPP1CB","ATP5F1A",
+             "EGR1","TSPO","SDHC","NDUFS4")
+for(i in s.genes){
+  p <- plot_genes_in_pseudotime(cds[i,], 
+                                color_by = "sub_cell_type")+ 
+    scale_color_npg()
+  ggsave(paste0(i,".pdf"),p,height = 2,width = 4)
+}
+
+s.genes <- c("EGR1","JUN")
+for(i in s.genes){
+  p <- plot_genes_in_pseudotime(cds[i,], 
+                                color_by = "sub_cell_type")+ 
+    scale_color_npg()
+  ggsave(paste0(i,".pdf"),p,height = 2,width = 4)
+}
+
+# pesudotime gene2 -----
+library(Seurat, lib.loc = "/usr/local/lib/R/site-library")
+library(AUCell)
+library(SCENIC)
+library(Seurat)
+library(pheatmap)
+library(patchwork)
+library(qs)
+library(stringr)
+library(monocle)
+library(dplyr)
+library(tidyverse)
+setwd("~/20240103_Atherosis/v2/result/Fig_SMC/5-supply/11-pesudotimegene/2")
+
 seurat.obj <- readRDS("~/20240103_Atherosis/result/Fig_SMC/subset_seurat/SMC_anno.rds")
 expr <- as.matrix(seurat.obj@assays$RNA@data)
 expr <- as.data.frame(expr)
@@ -612,3 +702,6 @@ for( i in genes){
     viridis::scale_color_viridis(option = "C")
   ggsave(paste0(i,".pdf"),p,height = 5,width = 5)
 }
+
+
+
