@@ -270,38 +270,42 @@ for(i in genes){
   data$gene <- paste0(i)
   colnames(data) <- c("value","group","gene")
   
-  p <- ggplot()+
+  p <-ggplot(data = data) +
     geom_half_violin(
+      aes(x = gene, y = value, fill = group,color = group),
       data = data %>% filter(group == "high"),
-      aes(x = gene,y = value),colour="#fe6958",fill="#fe6958",side = "l"
-    )+
+       side = "l"
+    ) +
     geom_half_violin(
+      aes(x = gene, y = value, fill = group,color = group),
       data = data %>% filter(group == "low"),
-      aes(x = gene,y = value),colour='#4c659f',fill='#4c659f',side = "r"
-    )+
-    theme_bw()+
-    theme(panel.grid=element_blank(),axis.text.x=element_blank())+
-    xlab("")+
-    ylab("expression")+
-    geom_point(data = data, aes(x = gene,y = value, fill = group),
-               stat = 'summary', fun=mean,
-               position = position_dodge(width = 0.2))+
-    stat_summary(data = data, aes(x = gene,y = value, fill = group),
-                 fun.min = function(x){quantile(x)[2]},
-                 fun.max = function(x){quantile(x)[4]},
-                 geom = 'errorbar', color='black',
-                 width=0.01,size=0.5,
-                 position = position_dodge(width = 0.2) )+
+       side = "r"
+    ) +
+    theme_bw() +
+    theme(panel.grid = element_blank(), axis.text.x = element_blank()) +
+    xlab("") +
+    ylab("expression") +
+    geom_point(aes(x = gene, y = value, fill = group),
+               stat = 'summary', fun = mean,
+               position = position_dodge(width = 0.2)) +
+    stat_summary(aes(x = gene, y = value, fill = group),
+                 fun.min = function(x) {quantile(x)[2]},
+                 fun.max = function(x) {quantile(x)[4]},
+                 geom = 'errorbar', color = 'black',
+                 width = 0.01, size = 0.5,
+                 position = position_dodge(width = 0.2)) +
     stat_compare_means(
-      data = data, aes(x = gene,y = value, fill = group),
-      symnum.args=list(cutpoints = c(0, 0.001, 0.01, 0.05, 1),
-                       symbols = c("***", "**", "*", "")),
+      aes(x = gene, y = value, fill = group),
+      data = data,
+      symnum.args = list(cutpoints = c(0, 0.001, 0.01, 0.05, 1),
+                         symbols = c("***", "**", "*", "")),
       label = "p.signif",
-      method = "t.test" 
-    )+
+      method = "t.test"
+    ) +
     theme(axis.text.x = element_text(angle = 0, hjust = 1),  
-          legend.position = "top",legend.key = element_rect(fill = c('#4c659f','#fe6958')),
-          legend.justification = "right")
+          legend.position = "top") +
+    scale_fill_manual(values = c("low" = '#4c659f', "high" = '#fe6958'))+
+    scale_color_manual(values = c("low" = '#4c659f', "high" = '#fe6958'))
   ggsave(paste0(i,".pdf"),height = 3,width = 2)
 }
 
