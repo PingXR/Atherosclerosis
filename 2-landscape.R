@@ -3,19 +3,18 @@ library(Seurat)
 library(tidyverse)
 library(tidydr)
 library(ggrastr)
-setwd("~/20240103_Atherosis/v2/result/Fig1")
 path <-"~/20240103_Atherosis/v2/result/1-dealdata/seurat_integration_anno2.rds"
 seurat_obj <- readRDS(path)
 DefaultAssay(seurat_obj) <- "RNA"
 
-mytheme <- theme_void() + #空白主题，便于我们后期添加tSNE箭头
-  theme(plot.margin = margin(5.5,15,5.5,5.5)) #画布空白页缘调整
+mytheme <- theme_void() +
+  theme(plot.margin = margin(5.5,15,5.5,5.5))
 a <- ggplot(tsne,aes(x= tSNE_1 , y = tSNE_2 ,color = cell_type,raster = TRUE) ) +  
   geom_point_rast(size = 0.4 , alpha =0.6 )+
-  theme_dr(xlength = 0.2, #x轴长度
-           ylength = 0.2, #y轴长度
-           arrow = grid::arrow(length = unit(0.1, "inches"), #箭头大小/长度
-                               ends = 'last', type = "closed")) + #箭头描述信息
+  theme_dr(xlength = 0.2, 
+           ylength = 0.2, 
+           arrow = grid::arrow(length = unit(0.1, "inches"), 
+                               ends = 'last', type = "closed")) +
   theme(panel.grid = element_blank())
 label <- tsne %>%
   group_by(cell_type)%>%
