@@ -238,6 +238,7 @@ df$feature_y <- factor(df$feature_y,levels = c("adult heart development",
                                                "acute inflammatory response",
                                                "inflammatory response"
 ))
+setwd("~/20240103_Atherosis/v2/result/Fig2/supply/2-m6apathway/figure")
 p3 <-df  %>%
   ggplot() +
   geom_point(aes(x = feature_x,
@@ -341,6 +342,7 @@ ann_colors <- list(Celltype=type_color, Pathway_Type = Genetype_color,m6A_type=m
 matrix_2[is.na(matrix_2)] <- 0
 colnames(matrix_2) <- gsub("\\.", "-", colnames(matrix_2) )
 bk <- c(seq(-4,-0.1,by=0.01),seq(0,4,by=0.01))
+setwd("~/20240103_Atherosis/v2/result/Fig2/supply/3-m6Atermgene/cell_surface_receptor_signaling_pathway_involved_in_heart_development/figure")
 pdf("1.pdf",height = 5,width = 10)
 p <- pheatmap(matrix_2,
               scale="row",
